@@ -1,0 +1,6 @@
+# Object files
+*.o
+# Library files
+*.a
+*.so
+*.dylib
