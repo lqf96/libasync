@@ -5,6 +5,11 @@ namespace libasync
 {   //Internal constructor
     EventMixin::EventMixin() : store(std::make_shared<EventMixin::EventHandlerStore>()) {}
 
+    //Trigger event (No parameter)
+    void EventMixin::trigger(std::string event)
+    {   this->trigger(event, boost::any());
+    }
+
     //Remove event listener
     bool EventMixin::off(std::string event, EventHandler handler)
     {   auto store = this->store;

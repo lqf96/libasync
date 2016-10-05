@@ -1,5 +1,7 @@
 #pragma once
 
+#include <libasync/misc.h>
+
 namespace libasync
 {   //Choose type from list by index
     template <size_t n, typename... List>
@@ -45,6 +47,9 @@ namespace libasync
         //Argument type
         template <size_t n>
         using Arg = ChooseType<n, AT...>;
+
+        //Signature type
+        typedef RT Signature(AT...);
 
         //Arguments amount
         static constexpr size_t n_args = sizeof...(AT);

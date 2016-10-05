@@ -4,58 +4,34 @@
 #include <memory>
 #include <list>
 #include <type_traits>
-#include <boost/any.hpp>
+#include <exception>
 #include <boost/blank.hpp>
 #include <libasync/func_traits.h>
 #include <libasync/taskloop.h>
+#include <libasync/misc.h>
 
 namespace libasync
-{   //Class definitions
-    class PromiseModule;
-
+{   //Promise context
     template <typename T>
     class PromiseCtx;
+    //Promise
     template <typename T>
     class Promise;
 
+    //Promise context (Void specialization)
     template <>
     class PromiseCtx<void>;
+    //Promise (Void specialization)
     template <>
     class Promise<void>;
 
-    //Promise module class (Also as a helper class)
-    class PromiseModule
-    {private:
-        //Promise data base type
+    //Promise namespace
+    namespace promise
+    {   //Promise data base type
         struct PromiseDataBase
         {   //Call callbacks
             virtual void call_back() = 0;
         };
-
-        //Extract wrapped type
-        template <typename T>
-        struct Extract
-        {   typedef T Type;
-        };
-
-        template <typename T>
-        struct Extract<Promise<T>>
-        {   typedef T Type;
-        };
-
-        //Promise data base reference type
-        typedef std::shared_ptr<PromiseDataBase> PromiseDataBaseRef;
-
-        //Pending callback queue
-        static thread_local std::list<PromiseDataBaseRef> pending_callback_queue;
-
-        //Promise task
-        static void promise_task()
-        {   //Trigger all callbacks
-            for (auto data : PromiseModule::pending_callback_queue)
-                data->call_back();
-            PromiseModule::pending_callback_queue.clear();
-        }
 
         //Fulfilled callback helper (Definition only)
         template <typename U, typename RT, typename T, typename FF>
@@ -71,15 +47,32 @@ namespace libasync
         template <typename ET, typename RF>
         struct RejectedHelper<void, void, ET, RF>;
 
-        //Friend classes
+        //Promise data base reference type
+        typedef std::shared_ptr<PromiseDataBase> PromiseDataBaseRef;
+
+        //Extract wrapped type
         template <typename T>
-        friend class Promise;
-    public:
-        //Cannot be constructed
-        PromiseModule() = delete;
+        struct Extract
+        {   typedef T Type;
+        };
+
+        template <typename T>
+        struct Extract<Promise<T>>
+        {   typedef T Type;
+        };
+
+        //Lift type trait
+        template <typename T>
+        using Lift = Promise<typename Extract<T>::Type>;
+
+        //Pending callback queue
+        extern thread_local std::list<PromiseDataBaseRef>* pending_callback_queue;
+
+        //Promise task
+        void promise_task();
 
         //Initialize promise module for current thread
-        static void init();
+        void init();
     };
 
     //Promise context class
@@ -100,6 +93,10 @@ namespace libasync
         {   Promise<T>::resolve_impl(this->data, value);
         }
 
+        void resolve(Promise<T> promise)
+        {   Promise<T>::resolve_impl(this->data, promise);
+        }
+
         //Reject promise
         template <typename U>
         void reject(U error)
@@ -107,17 +104,17 @@ namespace libasync
         }
     };
 
+    //Promise status
+    enum class PromiseStatus
+    {   PENDING,
+        RESOLVED,
+        REJECTED
+    };
+
     //Promise class
     template <typename T>
     class Promise
-    {public:
-        //Promise status
-        enum Status
-        {   PENDING = 0,
-            RESOLVED,
-            REJECTED
-        };
-    private:
+    {private:
         //Promise data type (Definition)
         struct PromiseData;
         //Promise data reference type
@@ -126,12 +123,12 @@ namespace libasync
         //Resolve wrapper type
         typedef std::function<void(T)> ResolveWrapper;
         //Reject wrapper type
-        typedef std::function<void(boost::any)> RejectWrapper;
+        typedef std::function<void(std::exception_ptr)> RejectWrapper;
 
         //Promise data type
-        struct PromiseData : public PromiseModule::PromiseDataBase
+        struct PromiseData : public promise::PromiseDataBase
         {   //Promise status
-            Status status;
+            PromiseStatus status;
             //Pending calling back
             bool pending_callback;
 
@@ -141,18 +138,18 @@ namespace libasync
             std::list<ResolveWrapper> fulfilled_wrappers;
 
             //Rejected error
-            boost::any error;
+            std::exception_ptr error;
             //Rejected wrappers
             std::list<RejectWrapper> rejected_wrappers;
 
             //Call back
             void call_back()
             {   //Resolved
-                if (this->status==Status::RESOLVED)
+                if (this->status==PromiseStatus::RESOLVED)
                     for (auto wrapper : this->fulfilled_wrappers)
                         wrapper(this->value);
                 //Rejected
-                else if (this->status==Status::REJECTED)
+                else if (this->status==PromiseStatus::REJECTED)
                     for (auto wrapper : this->rejected_wrappers)
                         wrapper(this->error);
 
@@ -169,55 +166,64 @@ namespace libasync
         //Resolve promise (Implementation)
         static void resolve_impl(PromiseDataRef data, T value)
         {   //Already settled
-            if (data->status!=Status::PENDING)
+            if (data->status!=PromiseStatus::PENDING)
                 return;
 
             //Set status and value
-            data->status = Status::RESOLVED;
+            data->status = PromiseStatus::RESOLVED;
             data->value = value;
             //Add to pending callback queue
             data->pending_callback = true;
-            auto _data = std::static_pointer_cast<PromiseModule::PromiseDataBase>(data);
-            PromiseModule::pending_callback_queue.push_back(_data);
+            auto _data = std::static_pointer_cast<promise::PromiseDataBase>(data);
+            promise::pending_callback_queue->push_back(_data);
+        }
+
+        static void resolve_impl(PromiseDataRef data, Promise<T> promise)
+        {   //Already settled
+            if (data->status!=PromiseStatus::PENDING)
+                return;
+
+            //Associate promises
+            Promise<T>::associate_status(data, promise.data);
         }
 
         //Reject promise (Implementation)
         template <typename U>
         static void reject_impl(Promise<T>::PromiseDataRef data, U error)
         {   //Already settled
-            if (data->status!=Status::PENDING)
+            if (data->status!=PromiseStatus::PENDING)
                 return;
 
             //Set status and error
-            data->status = Status::REJECTED;
-            data->error = error;
+            data->status = PromiseStatus::REJECTED;
+            data->error = ErrorHelper<U>::make(error);
             //Add to pending callback queue
             data->pending_callback = true;
-            auto _data = std::static_pointer_cast<PromiseModule::PromiseDataBase>(data);
-            PromiseModule::pending_callback_queue.push_back(_data);
+            auto _data = std::static_pointer_cast<promise::PromiseDataBase>(data);
+            promise::pending_callback_queue->push_back(_data);
         }
 
         //Associate promise status
         static void associate_status(PromiseDataRef outer_data, PromiseDataRef inner_data)
         {   switch (inner_data->status)
             {   //Resolved
-                case Status::RESOLVED:
+                case PromiseStatus::RESOLVED:
                 {   Promise<T>::resolve_impl(outer_data, inner_data->value);
                     break;
                 }
                 //Rejected
-                case Status::REJECTED:
+                case PromiseStatus::REJECTED:
                 {   Promise<T>::reject_impl(outer_data, inner_data->error);
                     break;
                 }
                 //Pending
-                case Status::PENDING:
+                case PromiseStatus::PENDING:
                 {   //Internal fulfilled callback
                     inner_data->fulfilled_wrappers.push_back([=](T value)
                     {   Promise<T>::resolve_impl(outer_data, value);
                     });
                     //Internal rejected callback
-                    inner_data->rejected_wrappers.push_back([=](boost::any error)
+                    inner_data->rejected_wrappers.push_back([=](std::exception_ptr error)
                     {   Promise<T>::reject_impl(outer_data, error);
                     });
                     break;
@@ -233,7 +239,7 @@ namespace libasync
         //Internal constructor
         Promise()
         {   auto data = this->data = std::make_shared<PromiseData>();
-            data->status = Status::PENDING;
+            data->status = PromiseStatus::PENDING;
             data->pending_callback = false;
         }
 
@@ -242,32 +248,22 @@ namespace libasync
         {   Promise<T>::resolve_impl(this->data, value);
         }
 
+        void resolve(Promise<T> promise)
+        {   Promise<T>::resolve_impl(this->data, promise);
+        }
+
         //Reject promise
         template <typename U>
         void reject(U error)
         {   Promise<T>::reject_impl(this->data, error);
         }
     public:
-        //Construct a promise by calling given executor
-        template <typename EF>
-        static Promise<T> create(EF executor)
-        {   //Check function signature
-            static_assert(
-                std::is_same<void, typename FnTrait<EF>::ReturnType>::value,
-                "The return type of the executor must be void."
-            );
-            static_assert(
-                FnTrait<EF>::n_args==1,
-                "The executor must have exactly one argument."
-            );
-            static_assert(
-                std::is_same<PromiseCtx<T>, typename FnTrait<EF>::template Arg<0>::Type>::value,
-                "The type of the first argument of the executor must be PromiseCtx<T>."
-            );
+        //Executor type
+        typedef std::function<void(PromiseCtx<T>)> Executor;
 
-            Promise<T> promise;
-            executor(PromiseCtx<T>(promise.data));
-            return promise;
+        //Constructor
+        Promise(Executor executor) : Promise()
+        {   executor(PromiseCtx<T>(this->data));
         }
 
         //Construct a promise with resolved state
@@ -275,7 +271,7 @@ namespace libasync
         {   Promise<T> promise;
             auto data = promise.data;
 
-            data->status = Status::RESOLVED;
+            data->status = PromiseStatus::RESOLVED;
             data->value = value;
 
             return promise;
@@ -291,8 +287,8 @@ namespace libasync
         {   Promise<T> promise;
             auto data = promise.data;
 
-            data->status = Status::REJECTED;
-            data->error = error;
+            data->status = PromiseStatus::REJECTED;
+            data->error = ErrorHelper<U>::make(error);
 
             return promise;
         }
@@ -303,7 +299,7 @@ namespace libasync
         {   typedef typename FnTrait<FF>::ReturnType ReturnType;
             //Check function signature
             static_assert(
-                std::is_same<U, typename PromiseModule::Extract<ReturnType>::Type>::value,
+                std::is_same<U, typename promise::Extract<ReturnType>::Type>::value,
                 "The return type of the fulfilled callback must correspond with returned promise type."
             );
             static_assert(
@@ -320,20 +316,20 @@ namespace libasync
             auto outer_data = outer_promise.data;
 
             //Rejected
-            if (self_data->status==Status::REJECTED)
+            if (self_data->status==PromiseStatus::REJECTED)
                 return Promise<U>();
             //Resolved
-            else if ((self_data->status==Status::RESOLVED)&&(!self_data->pending_callback))
+            else if ((self_data->status==PromiseStatus::RESOLVED)&&(!self_data->pending_callback))
             {   self_data->pending_callback = true;
                 //Add promise to pending callback queue
-                auto _self_data = std::static_pointer_cast<PromiseModule::PromiseDataBase>(self_data);
-                PromiseModule::pending_callback_queue.push_back(_self_data);
+                auto _self_data = std::static_pointer_cast<promise::PromiseDataBase>(self_data);
+                promise::pending_callback_queue->push_back(_self_data);
             }
 
             //Wrap fulfilled callback and push to queue
             self_data->fulfilled_wrappers.push_back([=](T value)
             {   //Can fulfilled callback
-                Promise<U> inner_promise = PromiseModule::FulfilledHelper<U, ReturnType, T, FF>::run(
+                Promise<U> inner_promise = promise::FulfilledHelper<U, ReturnType, T, FF>::run(
                     value,
                     fulfilled
                 );
@@ -359,7 +355,7 @@ namespace libasync
             typedef typename FnTrait<RF>::template Arg<0>::Type ErrorType;
             //Check function signature
             static_assert(
-                std::is_same<U, typename PromiseModule::Extract<ReturnType>::Type>::value,
+                std::is_same<U, typename promise::Extract<ReturnType>::Type>::value,
                 "The return type of the rejected callback must correspond with returned promise type."
             );
             static_assert(
@@ -372,21 +368,21 @@ namespace libasync
             auto outer_data = outer_promise.data;
 
             //Resolved
-            if (self_data->status==Status::RESOLVED)
+            if (self_data->status==PromiseStatus::RESOLVED)
                 return Promise<U>();
             //Rejected
-            else if ((self_data->status==Status::REJECTED)&&(!self_data->pending_callback))
+            else if ((self_data->status==PromiseStatus::REJECTED)&&(!self_data->pending_callback))
             {   self_data->pending_callback = true;
                 //Add promise to pending callback queue
-                auto _self_data = std::static_pointer_cast<PromiseModule::PromiseDataBase>(self_data);
-                PromiseModule::pending_callback_queue.push_back(_self_data);
+                auto _self_data = std::static_pointer_cast<promise::PromiseDataBase>(self_data);
+                promise::pending_callback_queue->push_back(_self_data);
             }
 
             //Wrap rejected callback and push to queue
-            self_data->rejected_wrappers.push_back([=](boost::any error)
+            self_data->rejected_wrappers.push_back([=](std::exception_ptr error)
             {   //Can fulfilled callback
-                Promise<U> inner_promise = PromiseModule::RejectedHelper<U, ReturnType, ErrorType, RF>::run(
-                    boost::any_cast<ErrorType>(error),
+                Promise<U> inner_promise = promise::RejectedHelper<U, ReturnType, ErrorType, RF>::run(
+                    ErrorHelper<ErrorType>::cast(error),
                     rejected
                 );
                 auto inner_data = inner_promise.data;
@@ -417,6 +413,17 @@ namespace libasync
         {   this->ctx.resolve(boost::blank());
         }
 
+        //Buggy (Incomplete type)
+        /*
+        void resolve(Promise<void> promise)
+        {   promise.then<void>([&]()
+            {   this->ctx.resolve(boost::blank());
+            }, [&](std::exception_ptr e)
+            {   this->ctx.reject(e);
+            });
+        }
+        */
+
         //Reject promise
         template <typename U>
         void reject(U error)
@@ -428,9 +435,6 @@ namespace libasync
     template <>
     class Promise<void> : protected Promise<boost::blank>
     {private:
-        //Empty object
-        static boost::blank empty_obj;
-
         //Fulfilled function wrapper
         template <typename RT, typename FF>
         struct FulfilledWrapper
@@ -471,39 +475,33 @@ namespace libasync
         {   Promise<boost::blank>::resolve(boost::blank());
         }
 
+        void resolve(Promise<void> promise)
+        {   promise.then<void>([=]()
+            {   this->resolve();
+            });
+            promise._catch<void>([=](std::exception_ptr e)
+            {   this->reject(e);
+            });
+        }
+
         //Reject promise
         template <typename U>
         void reject(U error)
         {   Promise<boost::blank>::reject(error);
         }
     public:
-        //Construct a promise by calling given executor
-        template <typename EF>
-        static Promise<void> create(EF executor)
-        {   //Check function signature
-            static_assert(
-                std::is_same<void, typename FnTrait<EF>::ReturnType>::value,
-                "The return type of the executor must be void."
-            );
-            static_assert(
-                FnTrait<EF>::n_args==1,
-                "The executor must have exactly one argument."
-            );
-            static_assert(
-                std::is_same<PromiseCtx<void>, typename FnTrait<EF>::template Arg<0>::Type>::value,
-                "The type of the first argument of the executor must be PromiseCtx<void>."
-            );
+        //Executor
+        typedef std::function<void(PromiseCtx<void>)> Executor;
 
-            Promise<void> promise([&](PromiseCtx<boost::blank> ctx)
-            {   executor(PromiseCtx<void>(ctx));
-            });
-            return promise;
-        }
+        //Constructor
+        Promise(Executor executor) : Promise<boost::blank>([=](PromiseCtx<boost::blank> ctx)
+        {   executor(PromiseCtx<void>(ctx));
+        }) {}
 
         //Construct a promise with resolved state
         static Promise<void> resolved()
         {   Promise<void> promise;
-            promise.Promise<boost::blank>::resolve(Promise<void>::empty_obj);
+            promise.Promise<boost::blank>::resolve(boost::blank());
             return promise;
         }
 
@@ -525,7 +523,7 @@ namespace libasync
         {   typedef typename FnTrait<FF>::ReturnType ReturnType;
             //Check function signature
             static_assert(
-                std::is_same<U, typename PromiseModule::Extract<ReturnType>::Type>::value,
+                std::is_same<U, typename promise::Extract<ReturnType>::Type>::value,
                 "The return type of the fulfilled callback must correspond with returned promise type."
             );
             static_assert(
@@ -547,43 +545,63 @@ namespace libasync
         //Catch
         template <typename U, typename RF>
         Promise<U> _catch(RF rejected)
-        {   Promise<boost::blank>::_catch(rejected);
+        {   return Promise<boost::blank>::_catch<U>(rejected);
         }
     };
 
     //Fulfilled callback helper
     template <typename U, typename RT, typename T, typename FF>
-    struct PromiseModule::FulfilledHelper
+    struct promise::FulfilledHelper
     {   //Run fulfilled handler
         static Promise<U> run(T value, FF fulfilled)
-        {   return Promise<U>::resolved(fulfilled(value));
+        {   try
+            {   return Promise<U>::resolved(fulfilled(value));
+            }
+            catch (...)
+            {   return Promise<U>::rejected(std::current_exception());
+            }
         }
     };
 
     template <typename T, typename FF>
-    struct PromiseModule::FulfilledHelper<void, void, T, FF>
+    struct promise::FulfilledHelper<void, void, T, FF>
     {   //Run fulfilled handler
         static Promise<void> run(T value, FF fulfilled)
-        {   fulfilled(value);
-            return Promise<void>::resolved();
+        {   try
+            {   fulfilled(value);
+                return Promise<void>::resolved();
+            }
+            catch (...)
+            {   return Promise<void>::rejected(std::current_exception());
+            }
         }
     };
 
     //Rejected callback helper
     template <typename U, typename RT, typename ET, typename RF>
-    struct PromiseModule::RejectedHelper
+    struct promise::RejectedHelper
     {   //Run rejected handler
         static Promise<U> run(ET error, RF rejected)
-        {   return Promise<U>::resolved(rejected(error));
+        {   try
+            {   return Promise<U>::resolved(rejected(error));
+            }
+            catch (...)
+            {   return Promise<U>::rejected(std::current_exception());
+            }
         }
     };
 
     template <typename ET, typename RF>
-    struct PromiseModule::RejectedHelper<void, void, ET, RF>
+    struct promise::RejectedHelper<void, void, ET, RF>
     {   //Run rejected handler
         static Promise<void> run(ET error, RF rejected)
-        {   rejected(error);
-            return Promise<void>::resolved();
+        {   try
+            {   rejected(error);
+                return Promise<void>::resolved();
+            }
+            catch (...)
+            {   return Promise<void>::rejected(std::current_exception());
+            }
         }
     };
 }

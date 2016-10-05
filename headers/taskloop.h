@@ -22,7 +22,7 @@ namespace libasync
         //Task loop data reference type
         typedef std::shared_ptr<TaskLoopData> TaskLoopDataRef;
 
-        //Thread task loop data
+        //Thread task data
         static thread_local TaskLoopDataRef thread_data;
 
         //Task loop data
@@ -40,7 +40,12 @@ namespace libasync
         void add(Task task);
         //Add a oneshot task to queue
         void oneshot(Task task);
-        //Remove task from queue (Problematic)
+        //Remove task from queue (Problematic; not implemented)
+
+        //Get amount of permanent tasks
+        size_t n_permanent_tasks();
+        //Get amount of oneshot tasks
+        size_t n_oneshot_tasks();
 
         //Run loop forever
         void run();

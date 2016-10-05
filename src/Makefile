@@ -1,16 +1,15 @@
 # Variables
 LIB_NAME = libasync
-INCLUDE = -I../include
-TARGETS = taskloop.o promise.o event.o
+TARGETS = taskloop.o promise.o event.o generator.o socket.o
+PLATFORM_TARGETS = socket.o
+CXXFLAGS = -std=c++11 -fpic -O3 -Iinclude -D_LIBASYNC_SRC
 
 # Platform specific
 PLATFORM=$(shell uname -s)
 ifeq ($(PLATFORM), Darwin)
-INCLUDE += -I/usr/local/include
+CXXFLAGS := -I/usr/local/include -D_XOPEN_SOURCE $(CXXFLAGS)
 endif
-
-# Built-in variables
-CXXFLAGS = -std=c++11 -fpic -O3 $(INCLUDE)
+TARGETS := $(TARGETS) $(addprefix $(PLATFORM)/,$(PLATFORM_TARGETS))
 
 # Library target
 static: $(TARGETS)

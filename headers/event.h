@@ -40,6 +40,8 @@ namespace libasync
                 for (auto handler : result_ptr->second)
                     handler(result);
         }
+
+        void trigger(std::string event);
     public:
         //Add event listener
         template <typename HT>
@@ -58,8 +60,7 @@ namespace libasync
             auto store = this->store;
             //Event handler
             EventHandler _handler = [&](boost::any _result)
-            {   auto result = boost::any_cast<ResultType>(_result);
-                handler(result);
+            {   handler(detail::cast_any<HT>(_result));
             };
 
             //Find event handler store for specific event
