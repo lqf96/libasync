@@ -13,60 +13,49 @@ namespace libasync
     {   return reinterpret_cast<uintptr_t>(func.template target<void>());
     }
 
-    //Exception pointer cast
-    template <typename T>
-    T exception_ptr_cast(std::exception_ptr _e)
-    {   try
-        {   std::rethrow_exception(_e);
-        }
-        //Casted to type T
-        catch (T e)
-        {   return e;
-        }
-        //Type mismatch; bad cast
-        catch (...)
-        {   throw std::bad_cast();
-        }
-    }
-
-#ifdef _LIBASYNC_SRC
-    //Exception helper
-    template <typename T>
-    struct ErrorHelper
-    {   //Make error
-        static std::exception_ptr make(T error)
+    //Implementation details
+    namespace detail
+    {   //Make exception pointer
+        template <typename T>
+        std::exception_ptr eptr_make(T error)
         {   return std::make_exception_ptr(error);
         }
 
-        //Cast to given type
-        static T cast(std::exception_ptr e)
-        {   return exception_ptr_cast<T>(e);
-        }
-    };
-
-    template <>
-    struct ErrorHelper<std::exception_ptr>
-    {   static std::exception_ptr make(std::exception_ptr e)
-        {   return e;
+        template <>
+        std::exception_ptr eptr_make<std::exception_ptr>(std::exception_ptr eptr)
+        {   return eptr;
         }
 
-        static std::exception_ptr cast(std::exception_ptr e)
-        {   return e;
+        //Cast exception pointer to given type
+        template <typename T>
+        T eptr_cast(std::exception_ptr eptr)
+        {   try
+            {   std::rethrow_exception(eptr);
+            }
+            //Casted to type T
+            catch (T e)
+            {   return e;
+            }
+            //Type mismatch; bad cast
+            catch (...)
+            {   throw std::bad_cast();
+            }
         }
-    };
 
-    //Implementation details
-    namespace detail
-    {   //Any cast helper
+        template <>
+        std::exception_ptr eptr_cast<std::exception_ptr>(std::exception_ptr eptr)
+        {   return eptr;
+        }
+
+        //Any cast helper
         template <typename T>
         T cast_any(boost::any value)
         {   return boost::any_cast<T>(value);
         }
 
-        //Any cast helper (No cast)
-        boost::any cast_any(boost::any value)
+        template <>
+        boost::any cast_any<boost::any>(boost::any value)
         {   return value;
         }
     }
-#endif
 }

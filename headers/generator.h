@@ -245,7 +245,7 @@ namespace libasync
                 //Suspended
                 case GenStatus::SUSPENDED:
                 {   data->in_val = nullptr;
-                    data->error = ErrorHelper<U>::make(error);
+                    data->error = detail::eptr_make(error);
                     data->status = GenStatus::RUNNING;
                     //Run generator
                     Generator<T, IT>::run_generator(data);

@@ -196,7 +196,7 @@ namespace libasync
 
             //Set status and error
             data->status = PromiseStatus::REJECTED;
-            data->error = ErrorHelper<U>::make(error);
+            data->error = detail::eptr_make(error);
             //Add to pending callback queue
             data->pending_callback = true;
             auto _data = std::static_pointer_cast<promise::PromiseDataBase>(data);
@@ -288,7 +288,7 @@ namespace libasync
             auto data = promise.data;
 
             data->status = PromiseStatus::REJECTED;
-            data->error = ErrorHelper<U>::make(error);
+            data->error = detail::eptr_make(error);
 
             return promise;
         }
@@ -382,7 +382,7 @@ namespace libasync
             self_data->rejected_wrappers.push_back([=](std::exception_ptr error)
             {   //Can fulfilled callback
                 Promise<U> inner_promise = promise::RejectedHelper<U, ReturnType, ErrorType, RF>::run(
-                    ErrorHelper<ErrorType>::cast(error),
+                    detail::eptr_cast<ErrorType>(error),
                     rejected
                 );
                 auto inner_data = inner_promise.data;
