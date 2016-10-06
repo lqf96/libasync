@@ -4,3 +4,5 @@
 *.a
 *.so
 *.dylib
+# Libasync build result
+libasync.*
