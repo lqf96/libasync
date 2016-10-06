@@ -17,18 +17,18 @@ namespace libasync
     namespace detail
     {   //Make exception pointer
         template <typename T>
-        std::exception_ptr eptr_make(T error)
+        inline std::exception_ptr eptr_make(T error)
         {   return std::make_exception_ptr(error);
         }
 
         template <>
-        std::exception_ptr eptr_make<std::exception_ptr>(std::exception_ptr eptr)
+        inline std::exception_ptr eptr_make(std::exception_ptr eptr)
         {   return eptr;
         }
 
         //Cast exception pointer to given type
         template <typename T>
-        T eptr_cast(std::exception_ptr eptr)
+        inline T eptr_cast(std::exception_ptr eptr)
         {   try
             {   std::rethrow_exception(eptr);
             }
@@ -43,18 +43,18 @@ namespace libasync
         }
 
         template <>
-        std::exception_ptr eptr_cast<std::exception_ptr>(std::exception_ptr eptr)
+        inline std::exception_ptr eptr_cast(std::exception_ptr eptr)
         {   return eptr;
         }
 
         //Any cast helper
         template <typename T>
-        T cast_any(boost::any value)
+        inline T cast_any(boost::any value)
         {   return boost::any_cast<T>(value);
         }
 
         template <>
-        boost::any cast_any<boost::any>(boost::any value)
+        inline boost::any cast_any(boost::any value)
         {   return value;
         }
     }
