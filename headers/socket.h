@@ -5,10 +5,14 @@
 #include <queue>
 #include <libasync/promise.h>
 #include <libasync/event.h>
+#include <libasync/reactor.h>
 
 namespace libasync
-{   //Socket class
-    class Socket : public EventMixin
+{   //Socket buffer size
+    static const size_t SOCK_BUFFER_SIZE = 1024;
+
+    //Socket class
+    class Socket : public EventMixin, public ReactorTarget
     {public:
         //Socket status
         enum class Status
@@ -45,8 +49,6 @@ namespace libasync
 
             //Write promise queue
             std::queue<PromiseQueueItem> write_promise_queue;
-            //Allow write flag
-            bool write_flag;
 
             //Local address
             in_addr_t local_addr;
@@ -58,7 +60,7 @@ namespace libasync
             in_port_t remote_port;
 
             //Constructor
-            SocketData() : status(Status::IDLE), bytes_read(0), bytes_written(0), write_flag(true), local_addr(INADDR_NONE) {}
+            SocketData() : status(Status::IDLE), bytes_read(0), bytes_written(0), local_addr(INADDR_NONE) {}
         };
 
         //Socket data reference type
@@ -70,13 +72,10 @@ namespace libasync
         //Internal constructor
         Socket(int fd);
 
-        //Reactor task
-        static void reactor_task();
-
         //Shared socket initialization logic
         void create();
         //Register socket to reactor
-        void _register();
+        void reactor_register();
 
         //Friend classes
         friend class ServerSocket;
@@ -110,10 +109,13 @@ namespace libasync
         size_t bytes_read();
         //Get bytes written
         size_t bytes_written();
+
+        //Respond to event
+        void __reactor_on_event(void* event);
     };
 
     //Server socket class
-    class ServerSocket : public EventMixin
+    class ServerSocket : public EventMixin, public ReactorTarget
     {public:
         //Socket status
         enum class Status
@@ -145,10 +147,7 @@ namespace libasync
         ServerSocketDataRef data;
 
         //Register socket to reactor
-        void _register();
-
-        //Friend classes
-        friend class Socket;
+        void reactor_register();
     public:
         //Constructor
         ServerSocket();
@@ -162,6 +161,9 @@ namespace libasync
         bool local_addr(in_addr_t* addr, in_port_t* port);
         //Get socket status
         Status status();
+
+        //Respond to event
+        void __reactor_on_event(void* event);
     };
 
     //Socket exception
@@ -169,10 +171,7 @@ namespace libasync
     {public:
         //Reason
         enum class Reason
-        {   REACTOR_INIT,
-            REACTOR_QUERY,
-            REACTOR_REG,
-            CREATE,
+        {   CREATE,
             MAKE_NON_BLOCK,
             BIND,
             LISTEN,

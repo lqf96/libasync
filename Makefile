@@ -1,7 +1,7 @@
 # Variables
 LIB_NAME = libasync
-DEPS = taskloop.o promise.o event.o generator.o socket.o
-PLATFORM_DEPS = socket.o
+DEPS = taskloop.o promise.o event.o generator.o socket.o reactor.o
+PLATFORM_DEPS = socket.o reactor.o
 CXXFLAGS = -std=c++11 -fpic -O3 -Iinclude
 STRIP = strip
 

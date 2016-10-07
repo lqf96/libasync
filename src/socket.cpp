@@ -61,7 +61,7 @@ namespace libasync
             throw SocketError(SocketError::Reason::MAKE_NON_BLOCK);
 
         //Register socket to reactor
-        this->_register();
+        this->reactor_register();
     }
 
     //Get local address and port
@@ -220,6 +220,8 @@ namespace libasync
     void Socket::close()
     {   auto data = this->data;
 
+        //Unregister socket from reactor
+        reactor_unreg(data->fd);
         //Close socket
         if (::close(data->fd)<0)
             throw SocketError(SocketError::Reason::CLOSE);
@@ -265,7 +267,7 @@ namespace libasync
             throw SocketError(SocketError::Reason::MAKE_NON_BLOCK);
 
         //Register socket to reactor
-        this->_register();
+        this->reactor_register();
     }
 
     //Listen
@@ -296,6 +298,8 @@ namespace libasync
     void ServerSocket::close()
     {   auto data = this->data;
 
+        //Unregister server socket from reactor
+        reactor_unreg(data->fd);
         //Close socket
         if (::close(data->fd)<0)
             throw SocketError(SocketError::Reason::CLOSE);
