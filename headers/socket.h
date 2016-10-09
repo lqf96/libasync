@@ -1,3 +1,5 @@
+#pragma once
+
 #include <netinet/in.h>
 #include <memory>
 #include <exception>
@@ -19,6 +21,7 @@ namespace libasync
         {   IDLE,
             CONNECTING,
             CONNECTED,
+            HALF_CLOSED,
             CLOSED
         };
     private:
@@ -82,9 +85,6 @@ namespace libasync
     public:
         //Constructor
         Socket();
-
-        //Initialize socket module
-        static void init();
 
         //Get local address and port
         bool local_addr(in_addr_t* addr, in_port_t* port);
@@ -173,6 +173,7 @@ namespace libasync
         enum class Reason
         {   CREATE,
             MAKE_NON_BLOCK,
+            REUSEADDR,
             BIND,
             LISTEN,
             CONNECT,

@@ -3,33 +3,29 @@
 
 namespace libasync
 {   //Internal constructor
-    EventMixin::EventMixin() : store(std::make_shared<EventMixin::EventHandlerStore>()) {}
+    EventMixin::EventMixin() : data(std::make_shared<EventMixinData>()) {}
 
-    //Trigger event (No parameter)
+    //Trigger event
     void EventMixin::trigger(std::string event)
-    {   this->trigger(event, boost::any());
+    {   return this->trigger(event, boost::any());
     }
 
     //Remove event listener
-    bool EventMixin::off(std::string event, EventHandler handler)
-    {   auto store = this->store;
-        //Find event handler store
-        auto result_ptr = store->find(event);
-        bool store_found = result_ptr!=store->end();
-        //Handler found flag
-        bool handler_found = false;
+    bool EventMixin::off(std::string event, size_t handle)
+    {   auto store = this->data->store;
 
-        //Store not found
-        if (!store_found)
+        //Find event handler store
+        auto result_ptr = store.find(event);
+        if (result_ptr==store.end())
             return false;
         //Find event handler
-        uintptr_t handler_ptr = func_addr(handler);
-        result_ptr->second.remove_if([&](EventHandler _handler)
-        {   bool addr_equal = handler_ptr==func_addr(_handler);
-            handler_found = handler_found||addr_equal;
-            return addr_equal;
-        });
+        EventHandlerStore& event_store = store[event];
+        auto handler_ptr = event_store.find(handle);
+        if (handler_ptr==event_store.end())
+            return false;
+        //Remove handler
+        event_store.erase(handler_ptr);
 
-        return handler_found;
+        return true;
     }
 }

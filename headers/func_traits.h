@@ -1,7 +1,5 @@
 #pragma once
 
-#include <libasync/misc.h>
-
 namespace libasync
 {   //Choose type from list by index
     template <size_t n, typename... List>

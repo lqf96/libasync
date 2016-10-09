@@ -3,15 +3,7 @@
 namespace libasync
 {   namespace promise
     {   //Pending callback queue
-        thread_local std::list<PromiseDataBaseRef>* pending_callback_queue = nullptr;
-
-        //Initialize promise module for current thread
-        void init()
-        {   //Initialize pending callback queue
-            pending_callback_queue = new std::list<PromiseDataBaseRef>();
-            //Add promise task to task loop
-            TaskLoop::thread_loop().add(promise_task);
-        }
+        thread_local std::list<promise::PromiseDataBaseRef>* pending_callback_queue = nullptr;
 
         //Promise task
         void promise_task()
@@ -20,5 +12,13 @@ namespace libasync
                 data->call_back();
             pending_callback_queue->clear();
         }
+    }
+
+    //Initialize promise module for current thread
+    void promise_init()
+    {   //Initialize pending callback queue
+        promise::pending_callback_queue = new std::list<promise::PromiseDataBaseRef>();
+        //Add promise task to task loop
+        TaskLoop::thread_loop().add(promise::promise_task);
     }
 }

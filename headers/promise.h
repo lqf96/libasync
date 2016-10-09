@@ -70,10 +70,10 @@ namespace libasync
 
         //Promise task
         void promise_task();
-
-        //Initialize promise module for current thread
-        void init();
     };
+
+    //Initialize promise module for current thread
+    void promise_init();
 
     //Promise context class
     template <typename T>
@@ -435,33 +435,6 @@ namespace libasync
     template <>
     class Promise<void> : protected Promise<boost::blank>
     {private:
-        //Fulfilled function wrapper
-        template <typename RT, typename FF>
-        struct FulfilledWrapper
-        {   FF& fulfilled;
-
-            //Constructor
-            FulfilledWrapper(FF& _fulfilled) : fulfilled(_fulfilled) {}
-
-            //Wrapped fulfilled callback
-            RT operator()(boost::blank _)
-            {   return fulfilled();
-            }
-        };
-
-        template <typename FF>
-        struct FulfilledWrapper<void, FF>
-        {   FF& fulfilled;
-
-            //Constructor
-            FulfilledWrapper(FF& _fulfilled) : fulfilled(_fulfilled) {}
-
-            //Wrapped fulfilled callback
-            void operator()(boost::blank _)
-            {   fulfilled();
-            }
-        };
-
         //Friend classes
         friend class PromiseCtx<void>;
         template <typename T>
@@ -531,9 +504,9 @@ namespace libasync
                 "Fulfilled callback must not have any arguments."
             );
 
-            return Promise<boost::blank>::then<ReturnType>(
-                FulfilledWrapper<ReturnType, FF>(fulfilled)
-            );
+            return Promise<boost::blank>::then<U>([=](boost::blank _) mutable
+            {   return fulfilled();
+            });
         }
 
         template <typename U, typename FF, typename RF>

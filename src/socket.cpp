@@ -162,7 +162,7 @@ namespace libasync
 
             return Promise<void>([=](PromiseCtx<void> ctx) mutable
             {   //Listen to connect event
-                this->on("connect", [=](boost::any _) mutable
+                this->on("connect", [=]() mutable
                 {   ctx.resolve();
                 });
             });
@@ -202,7 +202,7 @@ namespace libasync
         //Update written bytes count
         sock_data->bytes_written += offset;
         //Update buffer
-        buffer = buffer.substr(buffer.size()-offset);
+        buffer = buffer.substr(offset);
 
         //Completed
         if (completed)
@@ -219,15 +219,24 @@ namespace libasync
     //Close connection
     void Socket::close()
     {   auto data = this->data;
+        if ((data->status!=Status::CONNECTED)&&(data->status!=Status::HALF_CLOSED))
+            return;
 
-        //Unregister socket from reactor
-        reactor_unreg(data->fd);
         //Close socket
         if (::close(data->fd)<0)
             throw SocketError(SocketError::Reason::CLOSE);
-        //Set status and trigger "close" event
-        data->status = Status::CLOSED;
-        this->trigger("close");
+
+        //Half-closed
+        if (data->status==Status::HALF_CLOSED)
+        {   //Set status and trigger "close" event
+            data->status = Status::CLOSED;
+            this->trigger("close");
+            //Unregister server socket from reactor
+            reactor_unreg(data->fd);
+        }
+        //Open
+        else
+            data->status = Status::HALF_CLOSED;
     }
 
     //Get socket status
@@ -251,7 +260,7 @@ namespace libasync
     }
 
     //Server socket constructor
-    ServerSocket::ServerSocket()
+    ServerSocket::ServerSocket() : data(std::make_shared<ServerSocketData>())
     {   //Create socket file descriptor
         int fd = socket(AF_INET, SOCK_STREAM, 0);
         if (fd==-1)
@@ -265,6 +274,11 @@ namespace libasync
         flags |= O_NONBLOCK;
         if (fcntl(fd, F_SETFL, flags)<0)
             throw SocketError(SocketError::Reason::MAKE_NON_BLOCK);
+
+        //SO_REUSEADDR
+        int enable = 1;
+        if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(int))<0)
+            throw SocketError(SocketError::Reason::REUSEADDR);
 
         //Register socket to reactor
         this->reactor_register();
@@ -285,7 +299,7 @@ namespace libasync
         if (bind(data->fd, (sockaddr*)(&addr_obj), sizeof(sockaddr_in))<0)
             throw SocketError(SocketError::Reason::BIND);
         //Listen on given address
-        if (::listen(data->fd, SOMAXCONN)<0)
+        if (::listen(data->fd, backlog)<0)
             throw SocketError(SocketError::Reason::LISTEN);
         //Set local address and port
         data->local_addr = addr;
@@ -298,7 +312,7 @@ namespace libasync
     void ServerSocket::close()
     {   auto data = this->data;
 
-        //Unregister server socket from reactor
+        //Unregister socket from reactor
         reactor_unreg(data->fd);
         //Close socket
         if (::close(data->fd)<0)

@@ -58,9 +58,22 @@ namespace libasync
                 read_data.append(sock_buffer, count);
             }
 
-            //Half-closed; fully close connection
+            //Peer closed connection
             if (closed)
-                this->close();
+            {   //Half-closed
+                if (data->status==Status::HALF_CLOSED)
+                {   //Set status and trigger "close" event
+                    data->status = Status::CLOSED;
+                    this->trigger("close");
+                    //Unregister server socket from reactor
+                    reactor_unreg(data->fd);
+                }
+                //Open
+                else
+                {   data->status = Status::HALF_CLOSED;
+                    this->trigger("end");
+                }
+            }
             //No more data can be read
             else
             {   data->bytes_read += read_data.size();
@@ -108,10 +121,10 @@ namespace libasync
                 }
 
                 //Update write buffer and bytes written count
-                buffer = buffer.substr(buffer.size()-offset);
+                buffer = buffer.substr(offset);
                 data->bytes_written += offset;
                 //Resolve write promises
-                while (true)
+                while (data->write_promise_queue.size()>0)
                 {   auto promise_item = data->write_promise_queue.front();
                     //Target not reached
                     if (promise_item.target>data->bytes_written)
