@@ -90,9 +90,9 @@ namespace libasync
 
                 //Check connection error
                 if (getsockopt(data->fd, SOL_SOCKET, SO_ERROR, &result, &result_len)<0)
-                    throw SocketError(SocketError::Reason::CONNECT);
+                    this->trigger("error", SocketError(SocketError::Reason::CONNECT));
                 if (result!=0)
-                    throw SocketError(SocketError::Reason::CONNECT, result);
+                    this->trigger("error", SocketError(SocketError::Reason::CONNECT, result));
 
                 //Connected; trigger "connect" event
                 data->status = Status::CONNECTED;

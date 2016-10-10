@@ -18,7 +18,7 @@ namespace libasync
         }
 
         //Demultiplex events
-        for (unsigned int i=0;i<n_events;i++)
+        for (int i=0;i<n_events;i++)
         {   //Event object pointer
             auto event_ptr = epoll_data->events+i;
             //Lookup for reactor target

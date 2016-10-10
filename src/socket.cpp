@@ -223,20 +223,22 @@ namespace libasync
             return;
 
         //Close socket
-        if (::close(data->fd)<0)
+        if ((data->fd>=0)&&(::close(data->fd)<0))
             throw SocketError(SocketError::Reason::CLOSE);
 
-        //Half-closed
-        if (data->status==Status::HALF_CLOSED)
+        //Open
+        if (data->status==Status::CONNECTED)
+        {   data->fd = -1;
+            data->status = Status::HALF_CLOSED;
+        }
+        //Peer closed
+        else if ((data->status==Status::HALF_CLOSED)&&(data->fd>=0))
         {   //Set status and trigger "close" event
             data->status = Status::CLOSED;
             this->trigger("close");
             //Unregister server socket from reactor
             reactor_unreg(data->fd);
         }
-        //Open
-        else
-            data->status = Status::HALF_CLOSED;
     }
 
     //Get socket status

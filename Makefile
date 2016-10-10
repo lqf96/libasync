@@ -2,7 +2,7 @@
 LIB_NAME = libasync
 DEPS = taskloop.o promise.o event.o generator.o socket.o reactor.o
 PLATFORM_DEPS = socket.o reactor.o
-CXXFLAGS = -std=c++11 -fpic -g -Iinclude
+CXXFLAGS = -Wall -std=c++11 -fpic -g -Iinclude
 STRIP = strip
 
 PLATFORM=$(shell uname -s)
@@ -15,10 +15,11 @@ DEPS := $(addprefix src/,$(DEPS)) $(addprefix src/$(PLATFORM)/,$(PLATFORM_DEPS))
 
 # Library target
 static: $(DEPS)
-	ar rcs $(LIB_NAME).a $(DEPS)
+	$(AR) rcs $(LIB_NAME).a $(DEPS)
 shared: $(DEPS)
 ifeq ($(PLATFORM), Darwin)
 	$(CXX) -dynamiclib -o $(LIB_NAME).dylib $(DEPS)
+	$(STRIP) $(LIB_NAME).dylib
 else
 	$(CXX) -shared -o $(LIB_NAME).so $(DEPS)
 	$(STRIP) $(LIB_NAME).so
