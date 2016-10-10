@@ -7,8 +7,8 @@
 #include <libasync/socket.h>
 
 namespace libasync
-{   //Bytes written per round
-    static const size_t N_BYTES_PER_ROUND = 1024;
+{   //Buffer size
+    static const size_t N_BYTES_PER_ROUND = 4096;
 
     //Socket exception constructor
     SocketError::SocketError(Reason __reason, int __error_num)
@@ -78,7 +78,7 @@ namespace libasync
 
             //Failed to get local address and port
             if (getsockname(data->fd, (sockaddr*)(&addr_obj), &addr_obj_len)<0)
-                throw SocketError::Reason::GET_LOCAL_ADDR;
+                throw SocketError(SocketError::Reason::GET_LOCAL_ADDR);
 
             data->local_addr = addr_obj.sin_addr.s_addr;
             data->local_port = addr_obj.sin_port;

@@ -58,6 +58,12 @@ namespace libasync
                 read_data.append(sock_buffer, count);
             }
 
+            //Data received
+            if (!read_data.empty())
+            {   data->bytes_read += read_data.size();
+                this->trigger("data", read_data);
+            }
+
             //Peer closed connection
             if (closed)
             {   //Half-closed
@@ -74,14 +80,10 @@ namespace libasync
                     this->trigger("end");
                 }
             }
-            //No more data can be read
-            else
-            {   data->bytes_read += read_data.size();
-                this->trigger("data", read_data);
-            }
         }
+
         //Able to write or connect
-        else if (event->events&EPOLLOUT)
+        if (event->events&EPOLLOUT)
         {   //Connect
             if (data->status==Status::CONNECTING)
             {   int result;
@@ -175,9 +177,18 @@ namespace libasync
             //Create socket for incoming connection
             Socket client_sock(client_fd);
             auto client_data = client_sock.data;
-            //Set client local and remote address information
-            client_data->local_addr = data->local_addr;
-            client_data->local_port = data->local_port;
+
+            //Get client local address information
+            sockaddr_in addr_obj;
+            socklen_t addr_obj_len = sizeof(sockaddr_in);
+            //Failed to get local address and port
+            if (getsockname(client_fd, (sockaddr*)(&addr_obj), &addr_obj_len)<0)
+                throw SocketError(SocketError::Reason::GET_LOCAL_ADDR);
+            //Set client local address
+            client_data->local_addr = addr_obj.sin_addr.s_addr;
+            client_data->local_port = addr_obj.sin_port;
+            
+            //Set client remote address
             client_data->remote_addr = client_addr.sin_addr.s_addr;
             client_data->remote_port = client_addr.sin_port;
             //Trigger "connect" event
