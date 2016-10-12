@@ -1,17 +1,22 @@
 #include <unistd.h>
 #include <sys/event.h>
+#include <sys/time.h>
 #include <libasync/reactor.h>
 #include <libasync/taskloop.h>
 #include <libasync/FreeBSD/reactor.h>
 
+#include <cstdio>
+
 namespace libasync
 {   //Kqueue data
     thread_local KqueueData* kqueue_data = nullptr;
+    //Zero time object
+    const timespec zero_time = {.tv_sec = 0, .tv_nsec = 0};
 
     //Reactor task
     void reactor_task()
     {   //Wait for kevents
-        int n_events = kevent(kqueue_data->fd, nullptr, 0, kqueue_data->events, KEVENT_BUFFER_SIZE, 0);
+        int n_events = kevent(kqueue_data->fd, nullptr, 0, kqueue_data->events, KEVENT_BUFFER_SIZE, &zero_time);
         if (n_events==-1)
         {   ::close(kqueue_data->fd);
             throw ReactorError(ReactorError::Reason::QUERY);
