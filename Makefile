@@ -1,14 +1,20 @@
 # Variables
 LIB_NAME = libasync
 DEPS = taskloop.o promise.o event.o generator.o socket.o reactor.o
-PLATFORM_DEPS = socket.o reactor.o
-CXXFLAGS = -Wall -std=c++11 -fpic -O3 -Iinclude
+PLATFORM_DEPS = socket1.o reactor1.o
+CXXFLAGS = -Wall -std=c++11 -fpic -Iinclude
 STRIP = strip
 
 PLATFORM=$(shell uname -s)
 # macOS extra flags
 ifeq ($(PLATFORM), Darwin)
 CXXFLAGS := -I/usr/local/include -D_XOPEN_SOURCE $(CXXFLAGS)
+endif
+# Debug mode
+ifdef DEBUG
+CXXFLAGS := $(CXXFLAGS) -g
+else
+CXXFLAGS := $(CXXFLAGS) -O3
 endif
 # Generate full dependencies list
 DEPS := $(addprefix src/,$(DEPS)) $(addprefix src/$(PLATFORM)/,$(PLATFORM_DEPS))
