@@ -91,9 +91,17 @@ namespace libasync
 
                 //Check connection error
                 if (getsockopt(data->fd, SOL_SOCKET, SO_ERROR, &result, &result_len)<0)
-                    throw SocketError(SocketError::Reason::CONNECT);
+                {   this->trigger("error", SocketError(SocketError::Reason::CONNECT));
+                    //Close socket and return
+                    this->close();
+                    return;
+                }
                 if (result!=0)
-                    throw SocketError(SocketError::Reason::CONNECT, result);
+                {   this->trigger("error", SocketError(SocketError::Reason::CONNECT, result));
+                    //Close socket and return
+                    this->close();
+                    return;
+                }
 
                 //Connected; trigger "connect" event
                 data->status = Status::CONNECTED;
@@ -187,7 +195,7 @@ namespace libasync
             //Set client local address
             client_data->local_addr = addr_obj.sin_addr.s_addr;
             client_data->local_port = addr_obj.sin_port;
-            
+
             //Set client remote address
             client_data->remote_addr = client_addr.sin_addr.s_addr;
             client_data->remote_port = client_addr.sin_port;

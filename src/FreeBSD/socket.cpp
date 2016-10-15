@@ -21,7 +21,7 @@ namespace libasync
         EV_SET(new_events, fd, EVFILT_READ, EV_ADD|EV_ENABLE, 0, 0, 0);
         EV_SET(new_events+1, fd, EVFILT_WRITE, EV_ADD|EV_ENABLE, 0, 0, 0);
         //Add to kqueue file descriptor
-        if (kevent(kqueue_data->fd, new_events, 2, nullptr, 0, 0)<0)
+        if (kevent(kqueue_data->fd, new_events, 2, nullptr, 0, &zero_time)<0)
             throw ReactorError(ReactorError::Reason::REG);
 
         //Add socket to lookup table
@@ -59,6 +59,12 @@ namespace libasync
                 read_data.append(sock_buffer, count);
             }
 
+            //Data received
+            if (!read_data.empty())
+            {   data->bytes_read += read_data.size();
+                this->trigger("data", read_data);
+            }
+
             //Peer closed connection
             if (closed)
             {   //Half-closed
@@ -75,11 +81,6 @@ namespace libasync
                     this->trigger("end");
                 }
             }
-            //No more data can be read
-            else
-            {   data->bytes_read += read_data.size();
-                this->trigger("data", read_data);
-            }
         }
         //Able to write or connect
         else if (event->filter==EVFILT_WRITE)
@@ -90,9 +91,17 @@ namespace libasync
 
                 //Check connection error
                 if (getsockopt(data->fd, SOL_SOCKET, SO_ERROR, &result, &result_len)<0)
-                    this->trigger("error", SocketError(SocketError::Reason::CONNECT));
+                {   this->trigger("error", SocketError(SocketError::Reason::CONNECT));
+                    //Close socket and return
+                    this->close();
+                    return;
+                }
                 if (result!=0)
-                    this->trigger("error", SocketError(SocketError::Reason::CONNECT, result));
+                {   this->trigger("error", SocketError(SocketError::Reason::CONNECT, result));
+                    //Close socket and return
+                    this->close();
+                    return;
+                }
 
                 //Connected; trigger "connect" event
                 data->status = Status::CONNECTED;
@@ -148,7 +157,7 @@ namespace libasync
         //Set kevent object
         EV_SET(&new_event, fd, EVFILT_READ, EV_ADD|EV_ENABLE, 0, 0, 0);
         //Add to kqueue file descriptor
-        if (kevent(kqueue_data->fd, &new_event, 1, nullptr, 0, 0)<0)
+        if (kevent(kqueue_data->fd, &new_event, 1, nullptr, 0, &zero_time)<0)
             throw ReactorError(ReactorError::Reason::REG);
 
         //Add server socket to lookup table

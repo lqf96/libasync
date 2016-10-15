@@ -1,17 +1,12 @@
 #include <unistd.h>
 #include <sys/event.h>
-#include <sys/time.h>
 #include <libasync/reactor.h>
 #include <libasync/taskloop.h>
 #include <libasync/FreeBSD/reactor.h>
 
-#include <cstdio>
-
 namespace libasync
 {   //Kqueue data
     thread_local KqueueData* kqueue_data = nullptr;
-    //Zero time object
-    const timespec zero_time = {.tv_sec = 0, .tv_nsec = 0};
 
     //Reactor task
     void reactor_task()
