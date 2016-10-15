@@ -22,10 +22,13 @@ namespace libasync
         {   //Event object pointer
             auto event_ptr = kqueue_data->events+i;
             //Lookup for reactor target
-            auto target = kqueue_data->table[event_ptr->ident];
+            //(Ignore if file descriptor not in table; why is it happening?)
+            auto table_pair_ptr = kqueue_data->table.find(event_ptr->ident);
+            if (table_pair_ptr==kqueue_data->table.end())
+                continue;
 
             //Call event handler
-            target->__reactor_on_event(event_ptr);
+            table_pair_ptr->second->__reactor_on_event(event_ptr);
         }
     }
 
