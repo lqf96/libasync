@@ -28,7 +28,7 @@ namespace libasync
                 continue;
 
             //Call event handler
-            table_pair_ptr->second->__reactor_on_event(event_ptr);
+            table_pair_ptr->second->reactor_on_event(event_ptr);
         }
     }
 

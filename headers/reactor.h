@@ -6,10 +6,13 @@
 namespace libasync
 {   //Reactor target
     class ReactorTarget
-    {public:
+    {protected:
         //React to event
-        virtual void __reactor_on_event(void* event) = 0;
+        virtual void reactor_on_event(void* event) = 0;
 
+        //Friend function
+        friend void reactor_task();
+    public:
         //Virtual destructor
         virtual ~ReactorTarget() {}
     };

@@ -25,7 +25,7 @@ namespace libasync
             auto target = epoll_data->table[event_ptr->data.fd];
 
             //Call event handler
-            target->__reactor_on_event(event_ptr);
+            target->reactor_on_event(event_ptr);
         }
     }
 

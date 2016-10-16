@@ -82,6 +82,9 @@ namespace libasync
 
         //Friend classes
         friend class ServerSocket;
+    protected:
+        //Respond to event
+        void reactor_on_event(void* event);
     public:
         //Constructor
         Socket();
@@ -109,9 +112,6 @@ namespace libasync
         size_t bytes_read();
         //Get bytes written
         size_t bytes_written();
-
-        //Respond to event
-        void __reactor_on_event(void* event);
     };
 
     //Server socket class
@@ -148,6 +148,9 @@ namespace libasync
 
         //Register socket to reactor
         void reactor_register();
+    protected:
+        //Respond to event
+        void reactor_on_event(void* event);
     public:
         //Constructor
         ServerSocket();
@@ -161,9 +164,6 @@ namespace libasync
         bool local_addr(in_addr_t* addr, in_port_t* port);
         //Get socket status
         Status status();
-
-        //Respond to event
-        void __reactor_on_event(void* event);
     };
 
     //Socket exception

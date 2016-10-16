@@ -29,7 +29,7 @@ namespace libasync
     }
 
     //Handle reactor event
-    void Socket::__reactor_on_event(void* _event)
+    void Socket::reactor_on_event(void* _event)
     {   auto event = (struct kevent*)_event;
         auto data = this->data;
 
@@ -165,7 +165,7 @@ namespace libasync
     }
 
     //Handle reactor event
-    void ServerSocket::__reactor_on_event(void* event)
+    void ServerSocket::reactor_on_event(void* event)
     {   auto data = this->data;
 
         while (true)
