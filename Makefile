@@ -8,7 +8,7 @@ STRIP = strip
 PLATFORM=$(shell uname -s)
 # macOS extra flags
 ifeq ($(PLATFORM), Darwin)
-CXXFLAGS := -I/usr/local/include -D_XOPEN_SOURCE $(CXXFLAGS)
+CXXFLAGS := -I/usr/local/include -D_XOPEN_SOURCE -mmacosx-version-min=10.9 $(CXXFLAGS)
 endif
 # Debug mode
 ifdef DEBUG
